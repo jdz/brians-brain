@@ -1,7 +1,15 @@
 (in-package :brians-brain)
 
+(declaim (optimize (speed 3) (safety 1)))
+
+(deftype cell () '(integer 0 2))
+(deftype brain () '(simple-array cell (*)))
+(deftype neighbours () '(simple-array cell (8)))
+(deftype array-index () `(integer 0 ,array-dimension-limit))
+
 (defun make-brain (w h)
-  (make-array (* w h) :element-type '(integer 0 2)))
+  (declare (type fixnum w h))
+  (make-array (* w h) :element-type 'cell))
 
 (defun make-initialised-brain (w h)
   (let ((cells (make-brain w h))
@@ -11,13 +19,19 @@
     cells))
 
 (defun rules (state neighbours)
+  (declare (type cell state)
+           (type neighbours neighbours))
   (case state
     (1 2)
     (2 0)
-    (t (if (= 2 (count 1 neighbours)) 1 0))))
+    (t (if (= 2 (loop for x across neighbours counting (= 1 x))) 1 0))))
 
 (defun neighbours (cells i w h)
-  (let ((l (length cells))
+  (declare (type brain cells)
+           (type array-index i)
+           (type fixnum w h))
+  (let ((result (the neighbours (load-time-value (make-array 8 :element-type 'cell))))
+        (l (length cells))
         (mx (1- w))
         (my (1- h)))
     (multiple-value-bind (y x)
@@ -34,21 +48,32 @@
                (ur (rt u))
                (dl (lt d))
                (dr (rt d)))
-          (mapcar (lambda (i) (aref cells i))
-                  (list ul u ur l r dl d dr)))))))
+          (setf (aref result 0) (aref cells ul)
+                (aref result 1) (aref cells u)
+                (aref result 2) (aref cells ur)
+                (aref result 3) (aref cells l)
+                (aref result 4) (aref cells r)
+                (aref result 5) (aref cells dl)
+                (aref result 6) (aref cells d)
+                (aref result 7) (aref cells dr))
+          result)))))
 
 (defun evolve (src w h)
+  (declare (type brain src))
   (let* ((l (length src))
          (dst (make-brain w h)))
+    (declare (type brain dst))
     (loop for i below l
        do (setf (aref dst i)
-                (funcall 'rules (aref src i) (neighbours src i w h))))
+                (rules (aref src i) (neighbours src i w h))))
     dst))
 
 (defun simulate (steps initial w h)
+  (declare (type fixnum steps w h)
+           (type brain initial))
   (loop with brain = initial
      repeat steps
-     do (setf brain (funcall 'evolve brain w h))
+     do (setf brain (evolve brain w h))
      finally (return brain)))
 
 (defun benchmark ()
@@ -65,7 +90,9 @@
                          (1024 1024 32)
                          (2048 2048 8)
                          (4096 4096 2))
-        do (let ((initial (make-initialised-brain w h)))
+        do #+ccl (ccl:gc)
+           #+sbcl (sb-ext:gc :full t)
+           (let ((initial (make-initialised-brain w h)))
              (format *trace-output* "*** ~Dx~D ~D iteration~:P ***~%" w h i)
              (time (simulate i initial w h))
              (finish-output *trace-output*)))
