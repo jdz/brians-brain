@@ -24,9 +24,9 @@
                (gl:vertex 0.9 0.9 0)
                (gl:vertex 0.1 0.9 0)))))
     (case cell
-      (:on (gl:color 1 1 1)
+      (1 (gl:color 1 1 1)
        (draw-cell x y))
-      (:dying (gl:color 0.5 0.5 0.5)
+      (2 (gl:color 0.5 0.5 0.5)
        (draw-cell x y)))))
 
 

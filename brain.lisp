@@ -1,20 +1,20 @@
 (in-package :brians-brain)
 
 (defun make-brain (w h)
-  (make-array (list h w) :initial-element :off))
+  (make-array (list h w) :element-type '(integer 0 2)))
 
 (defun make-initialised-brain (w h)
   (let ((cells (make-brain w h))
         (mid (floor w 2)))
-    (setf (aref cells 0 mid) :on)
-    (setf (aref cells 0 (1+ mid)) :on)
+    (setf (aref cells 0 mid) 1)
+    (setf (aref cells 0 (1+ mid)) 1)
     cells))
 
 (defun rules (state neighbours)
   (case state
-    (:on    :dying)
-    (:dying :off)
-    (t (if (= 2 (count :on neighbours)) :on :off))))
+    (1 2)
+    (2 0)
+    (t (if (= 2 (count 1 neighbours)) 1 0))))
 
 (defun neighbours (cells x y)
   (let* ((mx (1- (array-dimension cells 1)))
