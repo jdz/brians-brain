@@ -1,7 +1,9 @@
 (in-package :brians-brain)
 
 (defclass bb (glut:window)
-  ((cells :accessor cells-of :initarg :cells))
+  ((cells :accessor cells-of :initarg :cells)
+   (brain-width :accessor brain-width-of :initarg :brain-width)
+   (brain-height :accessor brain-height-of :initarg :brain-height))
   (:default-initargs
    :title "Brian's Brain in CL"
    :mode '(:double :rgb)))
@@ -10,8 +12,7 @@
   (gl:clear-color 0 0 0 0)
   (gl:matrix-mode :projection)
   (gl:load-identity)
-  (let ((cells (cells-of w)))
-    (gl:ortho 0 (array-dimension cells 1)  0 (array-dimension cells 0) -1 1)))
+  (gl:ortho 0 (brain-width-of w)  0 (brain-height-of w) -1 1))
 
 
 (defun render-cell (x y cell)
@@ -30,26 +31,31 @@
        (draw-cell x y)))))
 
 
-(defmethod glut:display ((w bb))
+(defmethod glut:display ((win bb))
   (gl:clear :color-buffer)
-  (let* ((cells (cells-of w))
-         (w (array-dimension cells 1))
-         (h (array-dimension cells 0)))
+  (let* ((cells (cells-of win))
+         (w (brain-width-of win))
+         (h (brain-height-of win)))
     (loop
       for j below h
       do (loop
            for i below w
-           do (render-cell i j (aref cells j i)))))
+           do (render-cell i j (aref cells (+ (* j w) i))))))
   (glut:swap-buffers))
 
 
 (defmethod glut:idle ((w bb))
-  (setf (cells-of w) (evolve (cells-of w)))
+  (setf (cells-of w)
+        (evolve (cells-of w)
+                (brain-width-of w)
+                (brain-height-of w)))
   (glut:post-redisplay))
 
 (defun run (w h ww wh)
   (glut:display-window
    (make-instance 'bb
                   :cells (make-initialised-brain w h)
+                  :brain-width w
+                  :brain-height h
                   :width ww
                   :height wh)))

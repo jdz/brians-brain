@@ -1,13 +1,13 @@
 (in-package :brians-brain)
 
 (defun make-brain (w h)
-  (make-array (list h w) :element-type '(integer 0 2)))
+  (make-array (* w h) :element-type '(integer 0 2)))
 
 (defun make-initialised-brain (w h)
   (let ((cells (make-brain w h))
         (mid (floor w 2)))
-    (setf (aref cells 0 mid) 1)
-    (setf (aref cells 0 (1+ mid)) 1)
+    (setf (aref cells mid) 1)
+    (setf (aref cells (1+ mid)) 1)
     cells))
 
 (defun rules (state neighbours)
@@ -16,42 +16,47 @@
     (2 0)
     (t (if (= 2 (count 1 neighbours)) 1 0))))
 
-(defun neighbours (cells x y)
-  (let* ((mx (1- (array-dimension cells 1)))
-         (my (1- (array-dimension cells 0)))
-         (l (if (zerop x) mx (1- x)))
-         (r (if (= x mx) 0 (1+ x)))
-         (u (if (zerop y) my (1- y)))
-         (d (if (= y my) 0 (1+ y))))
-    (mapcar (lambda (x y)
-              (aref cells y x))
-            (list l x r l r l x r)
-            (list u u u y y d d d))))
+(defun neighbours (cells i w h)
+  (let ((l (length cells))
+        (mx (1- w))
+        (my (1- h)))
+    (multiple-value-bind (y x)
+        (truncate i w)
+      (flet ((up (i) (if (zerop y) (- (+ i l) w) (- i w)))
+             (dn (i) (if (= y  my) (- (+ i w) l) (+ i w)))
+             (lt (i) (if (zerop x) (1- (+ i w))  (1- i)))
+             (rt (i) (if (= x  mx) (1+ (- i w))  (1+ i))))
+        (let* ((u (up i))
+               (d (dn i))
+               (l (lt i))
+               (r (rt i))
+               (ul (lt u))
+               (ur (rt u))
+               (dl (lt d))
+               (dr (rt d)))
+          (mapcar (lambda (i) (aref cells i))
+                  (list ul u ur l r dl d dr)))))))
 
-(defun evolve (src)
-  (let* ((w (array-dimension src 1))
-         (h (array-dimension src 0))
+(defun evolve (src w h)
+  (let* ((l (length src))
          (dst (make-brain w h)))
-    (loop
-      for j below h
-      do (loop
-           for i below w
-           do (setf (aref dst j i)
-                    (funcall 'rules (aref src j i) (neighbours src i j)))))
+    (loop for i below l
+       do (setf (aref dst i)
+                (funcall 'rules (aref src i) (neighbours src i w h))))
     dst))
 
-(defun simulate (steps initial)
+(defun simulate (steps initial w h)
   (loop with brain = initial
-        repeat steps
-        do (setf brain (funcall 'evolve brain))
-        finally (return brain)))
+     repeat steps
+     do (setf brain (funcall 'evolve brain w h))
+     finally (return brain)))
 
 (defun benchmark ()
   (format *trace-output* "Benchmarking on ~A ~A~%"
           (lisp-implementation-type)
           (lisp-implementation-version))
   ;; Warmup.
-  (simulate 10000 (make-initialised-brain 16 16))
+  (simulate 10000 (make-initialised-brain 16 16) 16 16)
   (loop for (w h i) in '((32    32  32768)
                          (64    64  8192)
                          (128  128  2048)
@@ -62,6 +67,6 @@
                          (4096 4096 2))
         do (let ((initial (make-initialised-brain w h)))
              (format *trace-output* "*** ~Dx~D ~D iteration~:P ***~%" w h i)
-             (time (simulate i initial))
+             (time (simulate i initial w h))
              (finish-output *trace-output*)))
   (values))
